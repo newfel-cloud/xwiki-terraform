@@ -11,17 +11,17 @@ module "global_addresses" {
   ]
 }
 
-module "xwiki_addresses" {
+module "xwiki_internal_addresses" { // module default is INTERNAL.
   source  = "terraform-google-modules/address/google"
   version = "3.1.1"
 
-  project_id   = var.project_id
-  region       = var.region
-  address_type = "EXTERNAL" // module default is INTERNAL. but resource default is EXTERNAL
+  project_id = var.project_id
+  region     = var.region
   names = [
-    "g-${var.region}-xwiki-01t-static-ip",
-    "g-${var.region}-xwiki-02t-static-ip",
+    "g-${var.region}-a-xwiki-01t-internal-static-ip",
+    "g-${var.region}-b-xwiki-02t-internal-static-ip",
   ]
+  addresses = var.internal_addresses
 }
 
 resource "google_compute_firewall" "rules" {

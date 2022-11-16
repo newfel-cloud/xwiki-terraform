@@ -1,0 +1,40 @@
+# IDE
+**/.DS_Store
+.DS_Store
+.classpath
+.project
+.idea
+.gradle
+
+# Build files
+bin
+prod
+build
+gensrc
+webgensrc
+gradle.build
+gradle.gensrc
+/target
+compile.out
+skycgdebug.log
+dist
+node_modules
+package-lock.json
+testing/
+**/xcuserdata/
+xcshareddata/
+
+# Other local files
+*.iml
+*.swp
+
+# Terraform files
+**/.terraform/*
+terraform/**/*.log
+terraform/**/*manifest.json
+terraform/entire-tf-output
+**/entire-tf-output
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfvars

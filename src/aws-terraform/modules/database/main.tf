@@ -1,12 +1,7 @@
-module "rds" {
-  source  = "terraform-aws-modules/rds/aws"
-  version = "5.1.0"
-
+resource "aws_db_instance" "rds" {
   // Engine options
-  engine               = "mysql"
-  engine_version       = "8.0.28"
-  family               = "mysql8.0" # require
-  major_engine_version = "8.0"      # require
+  engine         = "mysql"
+  engine_version = "8.0.28"
   // Settings
   identifier = "xwiki-s-db"
   username   = "root"
@@ -16,13 +11,15 @@ module "rds" {
   // Storage
   storage_type      = "standard" //magnetic
   allocated_storage = 20
+  multi_az          = var.enable_high_availability
   // Connectivity
   vpc_security_group_ids = [
-    var.sg_map.common.security_group_id,
+    var.sg_map["common"].security_group_id,
   ]
   // Additional configuration
   db_name = "xwiki"
-
+  // Back up
+  backup_retention_period = 7
 
   skip_final_snapshot = true
 }

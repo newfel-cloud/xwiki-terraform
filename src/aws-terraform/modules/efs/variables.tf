@@ -1,7 +1,9 @@
-variable "subnets" {
-  type = list(any)
+variable "subnet" {
+  description = "The subnet to add the mount target in."
+  type        = any
 }
 
 variable "sg_map" {
-  type = map(any)
+  description = "security-group map"
+  type        = map(any)
 }

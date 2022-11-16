@@ -1,23 +1,34 @@
 variable "region" {
-  type = string
+  default = "The region is used to naming style. ex: us-east-2"
+  type    = string
 }
 
 variable "vpc" {
-  type = any
+  description = "the AWS VPC in the current AWS Region."
+  type        = any
 }
 
 variable "subnets" {
-  type = any
+  description = " default subnets in the current region."
+  type        = any
 }
 
 variable "sg_map" {
-  type = map(any)
+  description = "security-group map"
+  type        = map(any)
 }
 
-variable "instance_map" {
-  type = map(any)
+variable "ec2_1" {
+  description = "Main ec2 instance1, it will be used to target-group."
+  type        = any
+}
+
+variable "ec2_2" {
+  description = "Main ec2 instance2, it will be used to target-group."
+  type        = any
 }
 
 variable "template" {
-  type = any
+  description = "Provides an EC2 launch template resource. Can be used to create instances or auto scaling groups."
+  type        = any
 }
