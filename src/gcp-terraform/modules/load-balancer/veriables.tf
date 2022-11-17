@@ -18,6 +18,18 @@ variable "region" {
   type        = string
 }
 
+variable "zone_code1" {
+  description = "It depends on the region. ex: a"
+  type        = string
+  default     = "a"
+}
+
+variable "zone_code2" {
+  description = "It depends on the region. ex: b"
+  type        = string
+  default     = "b"
+}
+
 variable "template" {
   description = "Self-link of instance template"
   type        = any

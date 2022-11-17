@@ -1,9 +1,10 @@
 module "networking" {
   source = "../modules/networking"
 
-  project_id         = var.project_id
-  region             = var.region
-  internal_addresses = var.internal_addresses
+  project_id             = var.project_id
+  region                 = var.region
+  internal_addresses     = var.internal_addresses
+  firewall_source_ranges = var.firewall_source_ranges
 }
 
 module "database" {
@@ -75,9 +76,10 @@ module "dns" {
   depends_on = [
     module.load_balancer
   ]
-  region         = var.region
-  dns_project_id = var.dns_project_id
-  managed_zone   = var.managed_zone
-  domain_name    = var.domain_name
-  lb_ip          = module.networking.global_addresses[0]
+  routing_policy_type = "default"
+  region              = var.region
+  dns_project_id      = var.dns_project_id
+  managed_zone        = var.managed_zone
+  domain_name         = var.domain_name
+  lb_ip               = module.networking.global_addresses[0]
 }

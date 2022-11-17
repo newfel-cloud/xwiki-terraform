@@ -1,22 +1,23 @@
+#==============================BACKENDS==============================#
 resource "google_compute_instance_group" "group_1" {
-  name = "g-${var.region}-a-group-manual"
+  name = "g-${var.region}-${var.zone_code1}-group-manual"
   named_port {
     name = "${var.region}-bkend-port" //same as google_compute_backend_service port_name
     port = 8080
   }
-  zone = "${var.region}-a"
+  zone = "${var.region}-${var.zone_code1}"
   instances = [
     var.vm1.id,
   ]
 }
 
 resource "google_compute_instance_group" "group_2" {
-  name = "g-${var.region}-b-group-manual"
+  name = "g-${var.region}-${var.zone_code2}-group-manual"
   named_port {
     name = "${var.region}-bkend-port" //same as google_compute_backend_service port_name
     port = 8080
   }
-  zone = "${var.region}-b"
+  zone = "${var.region}-${var.zone_code2}"
   instances = [
     var.vm2.id,
   ]
@@ -32,8 +33,8 @@ module "img" {
   instance_template = var.template
   region            = var.region
   distribution_policy_zones = [
-    "${var.region}-a",
-    "${var.region}-b"
+    "${var.region}-${var.zone_code1}",
+    "${var.region}-${var.zone_code2}"
   ]
   autoscaling_enabled = true
   max_replicas        = 10
@@ -71,8 +72,21 @@ module "img" {
     },
   ]
 }
+#==============================BACKENDS==============================#
+#==============================BACKEND_SERVICE==============================#
 
 resource "google_compute_backend_service" "xwiki_lb_http_bkend_vm_auto" {
+  load_balancing_scheme = "EXTERNAL_MANAGED" //non-classic Global Load Balancer
+  enable_cdn            = true
+  cdn_policy {
+    cache_key_policy {
+      include_host         = true
+      include_protocol     = true
+      include_query_string = true
+    }
+    negative_caching  = false
+    serve_while_stale = 0
+  }
   name      = "g-${var.region}-xwiki-lb-http-bkend-vm-auto"
   port_name = "${var.region}-bkend-port"
   backend {
@@ -91,23 +105,26 @@ resource "google_compute_backend_service" "xwiki_lb_http_bkend_vm_auto" {
     module.img.health_check_self_links[0],
   ]
 }
-
+#==============================BACKEND_SERVICE==============================#
+#==============================FRONTEND==============================#
 resource "google_compute_global_forwarding_rule" "xwiki_lb_http_frontend_ip" {
-  name       = "g-${var.region}-lb-http-frontend-ip"
-  ip_address = var.lb_ip
-  port_range = "8080-8080"
-  target     = google_compute_target_http_proxy.xwiki_lb_http_8080_target_proxy.id
+  load_balancing_scheme = "EXTERNAL_MANAGED" //non-classic Global Load Balancer
+  name                  = "g-${var.region}-lb-http-frontend-ip"
+  ip_address            = var.lb_ip
+  port_range            = "8080-8080"
+  target                = google_compute_target_http_proxy.xwiki_lb_http_8080_target_proxy.self_link
 }
 
 resource "google_compute_target_http_proxy" "xwiki_lb_http_8080_target_proxy" {
   name    = "xwiki-lb-http-8080-target-proxy"
-  url_map = google_compute_url_map.xwiki_lb_http_8080.id
+  url_map = google_compute_url_map.xwiki_lb_http_8080.self_link
 }
 
 resource "google_compute_url_map" "xwiki_lb_http_8080" {
-  default_service = google_compute_backend_service.xwiki_lb_http_bkend_vm_auto.id
+  default_service = google_compute_backend_service.xwiki_lb_http_bkend_vm_auto.self_link
   name            = "g-${var.region}-xwiki-lb-http-8080"
 }
+#==============================FRONTEND==============================#
 
 # module "gce-lb-http" {
 #   source            = "GoogleCloudPlatform/lb-http/google"

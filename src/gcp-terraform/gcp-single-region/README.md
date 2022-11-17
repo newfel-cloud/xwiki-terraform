@@ -19,6 +19,12 @@ internal_addresses = [
     "10.138.0.7",
     "10.138.0.8",
 ]
+
+//Health check service ip
+firewall_source_ranges = [
+  "130.211.0.0/22",
+  "35.191.0.0/16",
+]
 ```
 
 To set up the infrastructure, run Terraform commands in the current folder:

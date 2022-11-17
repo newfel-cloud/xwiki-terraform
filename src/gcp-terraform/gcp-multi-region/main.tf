@@ -1,14 +1,23 @@
 #==============================NETWORKING==============================#
+locals {
+  source_ranges = concat(
+    [
+      module.global_addresses.addresses[0],
+    ],
+    var.firewall_source_ranges
+  )
+}
+
 module "global_addresses" {
   source  = "terraform-google-modules/address/google"
   version = "3.1.1"
 
   project_id   = var.project_id
-  region       = var.region
+  region       = var.locations[0]["region"]
   address_type = "EXTERNAL" // module default is INTERNAL. but resource default is EXTERNAL
   global       = true
   names = [
-    "xwiki-${var.region}-lb-http-8080-ip",
+    "xwiki-${var.locations[0]["region"]}-lb-http-8080-ip",
   ]
 }
 
@@ -17,14 +26,14 @@ module "xwiki_internal_addresses1" {
   version = "3.1.1"
 
   project_id = var.project_id
-  region     = var.region
+  region     = var.locations[0]["region"]
   names = [
-    "g-${var.region}-a-xwiki-01t-internal-static-ip",
-    "g-${var.region}-b-xwiki-02t-internal-static-ip",
+    "g-${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][0]}-xwiki-01t-internal-static-ip",
+    "g-${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][1]}-xwiki-02t-internal-static-ip",
   ]
   addresses = [
-    "10.138.0.7",
-    "10.138.0.8",
+    "${var.locations[0]["addresses"][0]}",
+    "${var.locations[0]["addresses"][1]}",
   ]
 }
 
@@ -33,19 +42,19 @@ module "xwiki_internal_addresses2" {
   version = "3.1.1"
 
   project_id = var.project_id
-  region     = var.region2
+  region     = var.locations[1]["region"]
   names = [
-    "g-${var.region2}-b-xwiki-01t-internal-static-ip",
-    "g-${var.region2}-c-xwiki-02t-internal-static-ip",
+    "g-${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][0]}-xwiki-01t-internal-static-ip",
+    "g-${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][1]}-xwiki-02t-internal-static-ip",
   ]
   addresses = [
-    "10.142.0.9",
-    "10.142.0.10",
+    "${var.locations[1]["addresses"][0]}",
+    "${var.locations[1]["addresses"][1]}",
   ]
 }
 
 resource "google_compute_firewall" "rules" {
-  name    = "xwiki-${var.region}-fw-http-8080"
+  name    = "xwiki-${var.locations[0]["region"]}-fw-http-8080"
   network = "default"
   allow {
     protocol = "tcp"
@@ -53,29 +62,22 @@ resource "google_compute_firewall" "rules" {
       "8080",
     ]
   }
-  source_ranges = [
-    "130.211.0.0/22", //Health check service ip
-    "35.191.0.0/16",  //Health check service ip
-    module.global_addresses.addresses[0],
-    "59.120.29.30/32",    //company external public ip addresses
-    "211.22.0.66/32",     //company external public ip addresses
-    "125.227.137.224/30", //company external public ip addresses
-  ]
+  source_ranges = local.source_ranges
   target_tags = [
-    "g-${var.region}-a-xwiki-01t",
-    "g-${var.region}-b-xwiki-02t",
-    "g-${var.region}-xwiki-autoscale",
-    "g-${var.region2}-b-xwiki-01t",
-    "g-${var.region2}-c-xwiki-02t",
-    "g-${var.region2}-xwiki-autoscale",
+    "g-${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][0]}-xwiki-01t",
+    "g-${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][1]}-xwiki-02t",
+    "g-${var.locations[0]["region"]}-xwiki-autoscale",
+    "g-${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][0]}-xwiki-01t",
+    "g-${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][1]}-xwiki-02t",
+    "g-${var.locations[1]["region"]}-xwiki-autoscale",
   ]
 }
 #==============================NETWORKING==============================#
 #==============================DATABASE==============================#
 resource "google_sql_database_instance" "xwiki_inatance" {
-  name             = "xwiki-${var.region}-db"
+  name             = "xwiki-${var.locations[0]["region"]}-db"
   database_version = "MYSQL_8_0"
-  region           = var.region
+  region           = var.locations[0]["region"]
   settings {
     availability_type = var.availability_type
     backup_configuration {
@@ -83,8 +85,8 @@ resource "google_sql_database_instance" "xwiki_inatance" {
       binary_log_enabled = true
     }
     location_preference {
-      zone           = "${var.region}-a"
-      secondary_zone = "${var.region}-b" // can't not pass terraform plan if version < 3.39
+      zone           = "${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][0]}"
+      secondary_zone = "${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][1]}" // can't not pass terraform plan if version < 3.39
     }
     tier      = "db-custom-2-4096" //The machine type 
     disk_type = "PD_SSD"
@@ -102,13 +104,13 @@ resource "google_sql_database_instance" "xwiki_inatance" {
 }
 
 # resource "google_sql_database_instance" "db_replica" {
-#   name             = "xwiki-${var.region2}-db-replica"
+#   name             = "xwiki-${var.locations[1]["region"]}-db-replica"
 #   database_version = "MYSQL_8_0"
-#   region           = var.region2
+#   region           = var.locations[1]["region"]
 #   settings {
 #     availability_type = var.availability_type
 #     location_preference {
-#       zone           = "${var.region2}-b"
+#       zone           = "${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][0]}"
 #     }
 #     tier      = "db-custom-2-4096" //The machine type 
 #     disk_type = "PD_SSD"
@@ -161,14 +163,14 @@ resource "google_service_networking_connection" "private_vpc_connection" {
 module "file_store" {
   source = "../modules/file-store"
 
-  region = var.region
+  region = var.locations[0]["region"]
 }
 #==============================FILE_STORE==============================#
 #==============================BUILD_IMAGRE==============================#
 module "build_image" {
   source = "../modules/image-builder"
 
-  region           = var.region
+  region           = var.locations[0]["region"]
   project_id       = var.project_id
   file_sources_tcp = "./script-multi/tcp_gcp.xml" // start form packer folder
 }
@@ -180,7 +182,7 @@ module "vms_1" {
   depends_on = [
     module.build_image,
   ]
-  region       = var.region
+  region       = var.locations[0]["region"]
   project_id   = var.project_id
   internal_ips = module.xwiki_internal_addresses1.addresses
   service_account = {
@@ -213,9 +215,9 @@ module "vms_2" {
   depends_on = [
     module.build_image,
   ]
-  region       = var.region2
-  zone_code1   = "b"
-  zone_code2   = "c" 
+  region       = var.locations[1]["region"]
+  zone_code1   = var.locations[1]["zone_codes"][0]
+  zone_code2   = var.locations[1]["zone_codes"][1]
   project_id   = var.project_id
   internal_ips = module.xwiki_internal_addresses2.addresses
   service_account = {
@@ -244,69 +246,69 @@ module "vms_2" {
 #==============================VM_INSTANCES==============================#
 #==============================LOAD_BALANCER==============================#
 resource "google_compute_instance_group" "group_1" {
-  name = "g-${var.region}-a-group-manual"
+  name = "g-${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][0]}-group-manual"
   named_port {
     name = "bkend-port" //same as google_compute_backend_service port_name
     port = 8080
   }
-  zone = "${var.region}-a"
+  zone = "${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][0]}"
   instances = [
     module.vms_1.instance1.id
   ]
 }
 
 resource "google_compute_instance_group" "group_2" {
-  name = "g-${var.region}-b-group-manual"
+  name = "g-${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][1]}-group-manual"
   named_port {
     name = "bkend-port" //same as google_compute_backend_service port_name
     port = 8080
   }
-  zone = "${var.region}-b"
+  zone = "${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][1]}"
   instances = [
     module.vms_1.instance2.id
   ]
 }
 
 resource "google_compute_instance_group" "group_3" {
-  name = "g-${var.region2}-b-group-manual"
+  name = "g-${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][0]}-group-manual"
   named_port {
     name = "bkend-port"
     port = 8080
   }
-  zone = "${var.region2}-b"
+  zone = "${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][0]}"
   instances = [
     module.vms_2.instance1.id
   ]
 }
 
 resource "google_compute_instance_group" "group_4" {
-  name = "g-${var.region2}-c-group-manual"
+  name = "g-${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][1]}-group-manual"
   named_port {
     name = "bkend-port" //same as google_compute_backend_service port_name
     port = 8080
   }
-  zone = "${var.region2}-c"
+  zone = "${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][1]}"
   instances = [
     module.vms_2.instance2.id
   ]
 }
 
 resource "google_compute_region_instance_group_manager" "mig_1" {
-  region = var.region
-  base_instance_name = "g-${var.region}-group-autoscale"
-  name   = "g-${var.region}-group-autoscale"
+  region             = var.locations[0]["region"]
+  base_instance_name = "g-${var.locations[0]["region"]}-group-autoscale"
+  name               = "g-${var.locations[0]["region"]}-group-autoscale"
   version {
     instance_template = module.vms_1.template
   }
   named_port {
-      name = "bkend-port" //same as google_compute_backend_service port_name
-      port = 8080
+    name = "bkend-port" //same as google_compute_backend_service port_name
+    port = 8080
   }
   distribution_policy_zones = [
-    "${var.region}-a",
-    "${var.region}-b",
+    "${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][0]}",
+    "${var.locations[0]["region"]}-${var.locations[0]["zone_codes"][1]}",
   ]
-  
+
   auto_healing_policies {
     health_check      = google_compute_health_check.xwiki_http_health_check.id
     initial_delay_sec = 120
@@ -314,14 +316,14 @@ resource "google_compute_region_instance_group_manager" "mig_1" {
 }
 
 resource "google_compute_region_autoscaler" "autoscaler_1" {
-  region = var.region
-  name   = "${var.region}-autoscaler"
+  region = var.locations[0]["region"]
+  name   = "${var.locations[0]["region"]}-autoscaler"
   target = google_compute_region_instance_group_manager.mig_1.id
 
   autoscaling_policy {
-    max_replicas        = 10
-    min_replicas        = 1
-    cooldown_period     = 120
+    max_replicas    = 10
+    min_replicas    = 1
+    cooldown_period = 120
     cpu_utilization {
       target = 0.5
     }
@@ -329,21 +331,21 @@ resource "google_compute_region_autoscaler" "autoscaler_1" {
 }
 
 resource "google_compute_region_instance_group_manager" "mig_2" {
-  region = var.region2
-  base_instance_name = "g-${var.region2}-group-autoscale"
-  name   = "g-${var.region2}-group-autoscale"
+  region             = var.locations[1]["region"]
+  base_instance_name = "g-${var.locations[1]["region"]}-group-autoscale"
+  name               = "g-${var.locations[1]["region"]}-group-autoscale"
   version {
     instance_template = module.vms_2.template
   }
   named_port {
-      name = "bkend-port" //same as google_compute_backend_service port_name
-      port = 8080
+    name = "bkend-port" //same as google_compute_backend_service port_name
+    port = 8080
   }
   distribution_policy_zones = [
-    "${var.region2}-b",
-    "${var.region2}-c",
+    "${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][0]}",
+    "${var.locations[1]["region"]}-${var.locations[1]["zone_codes"][1]}",
   ]
-  
+
   auto_healing_policies {
     health_check      = google_compute_health_check.xwiki_http_health_check.id
     initial_delay_sec = 120
@@ -351,14 +353,14 @@ resource "google_compute_region_instance_group_manager" "mig_2" {
 }
 
 resource "google_compute_region_autoscaler" "autoscaler_2" {
-  region = var.region2
-  name   = "${var.region2}-autoscaler"
+  region = var.locations[1]["region"]
+  name   = "${var.locations[1]["region"]}-autoscaler"
   target = google_compute_region_instance_group_manager.mig_2.id
 
   autoscaling_policy {
-    max_replicas        = 10
-    min_replicas        = 1
-    cooldown_period     = 120
+    max_replicas    = 10
+    min_replicas    = 1
+    cooldown_period = 120
     cpu_utilization {
       target = 0.5
     }
@@ -366,30 +368,41 @@ resource "google_compute_region_autoscaler" "autoscaler_2" {
 }
 
 resource "google_compute_backend_service" "xwiki_lb_http_bkend_vm_auto" {
+  load_balancing_scheme = "EXTERNAL_MANAGED" //non-classic Global Load Balancer
+  enable_cdn            = true
+  cdn_policy {
+    cache_key_policy {
+      include_host         = true
+      include_protocol     = true
+      include_query_string = true
+    }
+    negative_caching  = false
+    serve_while_stale = 0
+  }
   name      = "g-xwiki-lb-http-bkend-vm-auto"
   port_name = "bkend-port"
   backend {
-    group = google_compute_region_instance_group_manager.mig_1.instance_group
+    group           = google_compute_region_instance_group_manager.mig_1.instance_group
     max_utilization = 0.8
   }
   backend {
-    group = google_compute_region_instance_group_manager.mig_2.instance_group
+    group           = google_compute_region_instance_group_manager.mig_2.instance_group
     max_utilization = 0.8
   }
   backend {
-    group = google_compute_instance_group.group_1.self_link
+    group           = google_compute_instance_group.group_1.self_link
     max_utilization = 0.8
   }
   backend {
-    group = google_compute_instance_group.group_2.self_link
+    group           = google_compute_instance_group.group_2.self_link
     max_utilization = 0.8
   }
   backend {
-    group = google_compute_instance_group.group_3.self_link
+    group           = google_compute_instance_group.group_3.self_link
     max_utilization = 0.8
   }
   backend {
-    group = google_compute_instance_group.group_4.self_link
+    group           = google_compute_instance_group.group_4.self_link
     max_utilization = 0.8
   }
   health_checks = [ //only one
@@ -398,17 +411,18 @@ resource "google_compute_backend_service" "xwiki_lb_http_bkend_vm_auto" {
 }
 
 resource "google_compute_health_check" "xwiki_http_health_check" {
-  name               = "xwiki-http-health-check"
+  name = "xwiki-http-health-check"
   tcp_health_check {
-    port         = 8080
+    port = 8080
   }
 }
 
 resource "google_compute_global_forwarding_rule" "xwiki_lb_http_frontend_ip" {
-  name       = "g-lb-http-frontend-ip"
-  ip_address = module.global_addresses.addresses[0]
-  port_range = "8080-8080"
-  target     = google_compute_target_http_proxy.xwiki_lb_http_8080_target_proxy.id
+  load_balancing_scheme = "EXTERNAL_MANAGED" //non-classic Global Load Balancer
+  name                  = "g-lb-http-frontend-ip"
+  ip_address            = module.global_addresses.addresses[0]
+  port_range            = "8080-8080"
+  target                = google_compute_target_http_proxy.xwiki_lb_http_8080_target_proxy.id
 }
 
 resource "google_compute_target_http_proxy" "xwiki_lb_http_8080_target_proxy" {
@@ -431,10 +445,10 @@ module "dns" {
     google_compute_global_forwarding_rule.xwiki_lb_http_frontend_ip
   ]
   routing_policy_type = "default"
-  region         = var.region
-  dns_project_id = var.dns_project_id
-  managed_zone   = var.managed_zone
-  domain_name    = var.domain_name
-  lb_ip          = module.global_addresses.addresses[0]
+  region              = var.locations[0]["region"]
+  dns_project_id      = var.dns_project_id
+  managed_zone        = var.managed_zone
+  domain_name         = var.domain_name
+  lb_ip               = module.global_addresses.addresses[0]
 }
 #==============================DNS==============================#

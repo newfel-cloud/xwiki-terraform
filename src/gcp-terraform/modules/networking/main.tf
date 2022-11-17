@@ -1,3 +1,12 @@
+locals {
+  source_ranges = concat(
+    [
+      module.global_addresses.addresses[0],
+    ],
+    var.firewall_source_ranges
+  )
+}
+
 module "global_addresses" {
   source  = "terraform-google-modules/address/google"
   version = "3.1.1"
@@ -18,8 +27,8 @@ module "xwiki_internal_addresses" { // module default is INTERNAL.
   project_id = var.project_id
   region     = var.region
   names = [
-    "g-${var.region}-a-xwiki-01t-internal-static-ip",
-    "g-${var.region}-b-xwiki-02t-internal-static-ip",
+    "g-${var.region}-${var.zone_code1}-xwiki-01t-internal-static-ip",
+    "g-${var.region}-${var.zone_code2}-xwiki-02t-internal-static-ip",
   ]
   addresses = var.internal_addresses
 }
@@ -33,17 +42,10 @@ resource "google_compute_firewall" "rules" {
       "8080",
     ]
   }
-  source_ranges = [
-    "130.211.0.0/22", //Health check service ip
-    "35.191.0.0/16",  //Health check service ip
-    module.global_addresses.addresses[0],
-    "59.120.29.30/32",    //company external public ip addresses
-    "211.22.0.66/32",     //company external public ip addresses
-    "125.227.137.224/30", //company external public ip addresses
-  ]
+  source_ranges = local.source_ranges
   target_tags = [
-    "g-${var.region}-a-xwiki-01t",
-    "g-${var.region}-b-xwiki-02t",
+    "g-${var.region}-${var.zone_code1}-xwiki-01t",
+    "g-${var.region}-${var.zone_code2}-xwiki-02t",
     "g-${var.region}-xwiki-autoscale",
   ]
 }

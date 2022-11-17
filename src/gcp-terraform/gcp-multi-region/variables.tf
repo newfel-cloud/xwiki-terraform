@@ -3,14 +3,9 @@ variable "project_id" {
   type        = string
 }
 
-variable "region" {
-  description = "google cloud region where the resource will be created. ex: us-west1"
-  type        = string
-}
-
-variable "region2" {
-  description = "google cloud region where the resource will be created. ex: us-east1"
-  type        = string
+variable "locations" {
+  description = "The location contains region, zone_codes(at least two zone codes) and addresses(at least two addresses), zone code and address depend on the region."
+  type        = list(any)
 }
 
 variable "availability_type" {
@@ -40,4 +35,10 @@ variable "managed_zone" {
 variable "domain_name" {
   description = "name field must end with trailing dot ex: xxx.yyy.co."
   type        = string
+}
+
+variable "firewall_source_ranges" {
+  description = "The firewall will apply only to traffic that has source IP address in these ranges. These ranges must be expressed in CIDR format."
+  type        = list(string)
+  default     = []
 }

@@ -7,14 +7,48 @@ Before applying the Terraform commands, please add or modify the Terraform varia
 
 ```
 project_id        = "<your gcp project id>"
-region            = "us-west1"
-region2           = "us-east1"
+
+locations  = [
+  {
+    "region"     = "us-west1"
+    "zone_codes" = ["a", "b"]
+    "addresses" = [
+      "10.138.0.7",
+      "10.138.0.8",
+    ]
+  },
+  {
+    "region"     = "us-east1"
+    "zone_codes" = ["b", "c"]
+    "addresses" = [
+      "10.142.0.9",
+      "10.142.0.10",
+    ]
+  }
+]
+
 availability_type = "REGIONAL"
 vm_sa_email       = "<Service account email in your gcp project>"
 dns_project_id    = "<DNS project id>"
 managed_zone      = "<Name of your DNS zone>"
 domain_name       = "<Name of your domain, must end with a trailing dot>"
+
+//Health check service ip
+firewall_source_ranges = [
+  "130.211.0.0/22",
+  "35.191.0.0/16",
+]
 ```
+
+## Notice
+
+- region: GCP region where the resource will be created. Ex: us-west1
+- zone_code: The alphabet at the end of the region. Ex: us-west1-a ---> a
+- address: The IP addresses must be within the specified subnetwork
+- ```at least one location.```
+- ```zone_codes and addresses depend on its region.```
+
+---
 
 To set up the infrastructure, run Terraform commands in the current folder:
 
